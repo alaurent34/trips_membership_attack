@@ -1,7 +1,14 @@
-!./data
-./data/*
+# exclude everything
+data/*
 
-!./results
-./results/*
+# exception to the rule
+!data/.gitkeep
+
+# exclude everything
+results/*
+
+# exception to the rule
+!results/.gitkeep
+
 
 *.swp
