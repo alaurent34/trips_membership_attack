@@ -24,7 +24,7 @@ from numba.typed import List
 # gather data
 TRIPS_ID_TARGETTED = pd.read_csv("./data/trips_id_target.csv")
 USERS_TARGETTED = np.sort(
-    np.load("./data/uuid_target.csv.npy", allow_pickle=1)
+    np.load("./data/uuid_target.npy", allow_pickle=1)
 )
 TRIPS = pd.read_csv("./data/trips.csv")
 
@@ -39,6 +39,10 @@ TS_SIZE = 0.75                       # 1 is all the traj, 0 is none of them
 TR_DATA_SIZE = 10
 TS_DATA_SIZE = 10
 
+# set the number of points and trips in the Adv knowledge
+TR_POINTS_NB = 4
+TR_TRIPS_NB = 2
+
 # set the rounding value of the geospatial points
 ROUNDING = 3
 
@@ -46,7 +50,11 @@ ROUNDING = 3
 TRIPS_COLUMNS = ['trip_id', 'lat_first', 'lat_last', 'lng_first', 'lng_last', 'uuid']
 
 # set the result path
-RESULT_PATH = "./results/"
+LACIE = True
+LACIE_PATH = "/run/media/antoine/LaCie/"
+TR_TS_NAME = f"tr_size={TR_SIZE}_ts_size={TS_SIZE}"
+INSTANCE_NAME = TR_TS_NAME + f"_nb_adv_trips={TR_TRIPS_NB}_nb_adv_points={TR_POINTS_NB}"
+RESULT_PATH = f"./results/{INSTANCE_NAME}/"
 os.makedirs(RESULT_PATH, exist_ok=True)
 
 # ------------ END VARIABLES DEFINITION --------------- #
@@ -183,7 +191,7 @@ def fetch_user_trips(trips, tr_trips_id, rounding=ROUNDING, nb_instance=10):
     tr_trips = np.unique(tr_trips, axis=0)       # remove duplicates
 
     # create the prior knowledge of Adv
-    tr_data = sample_data(tr_trips, nb_repeat=2, nb_instance=nb_instance)
+    tr_data = sample_data(tr_trips, nb_repeat=TR_TRIPS_NB, nb_instance=nb_instance)
 
     return tr_data
 
@@ -204,7 +212,7 @@ def fetch_user_points(trips, tr_trips_id, rounding=ROUNDING, nb_instance=10):
     points = np.round(points, rounding)
     points = np.unique(points, axis=0)          # remove duplicates
 
-    tr_data = sample_data(points, nb_instance=nb_instance)
+    tr_data = sample_data(points, nb_repeat= TR_POINTS_NB, nb_instance=nb_instance)
 
     return tr_data
 
@@ -317,11 +325,14 @@ def predict(name, ts_data, tr_data, nb_instance_adv, nb_instance_chl, rounding=R
     doc
     """
 
-    result = np.zeros((nb_instance_adv, nb_instance_chl))
     # update nb_instance_adv (if there was not enought data to build nb_instance_adv in the first place)
     nb_instance_adv = min(nb_instance_adv, tr_data.shape[0])
     # update nb_instance_chl (if there was not enought data to build nb_instance_chl in the first place)
-    nb_instance_chl = min(nb_instance_adv, ts_data.shape[0])
+    updated_instance_chl = ts_data[["group_id", "in"]].drop_duplicates().set_index("group_id").shape[0]
+    nb_instance_chl = min(nb_instance_chl, ts_data.shape[0])
+
+    result = np.zeros((nb_instance_adv, nb_instance_chl))
+
     # for each auxiliare knowledge
     for i in range(nb_instance_adv):
         for j in range(nb_instance_chl):
@@ -356,8 +367,8 @@ def scores(attack_type, uuid, group_size, labels, predictions, _scores):
     df_res_cols = ['uuid', 'attack', 'tp', 'fp', 'fn', 'tn', 'acc', 'ppv', 'tpr', 'fpr', 'auc', 'f1']
 
     # if there is a file for the users
-    if os.path.isfile('results/' + 'res_' + str(group_size) + '.csv'):
-        res = pd.read_csv('results/' + 'res_' + str(group_size) + '.csv')
+    if os.path.isfile(RESULT_PATH + 'res_' + str(group_size) + '.csv'):
+        res = pd.read_csv(RESULT_PATH + 'res_' + str(group_size) + '.csv')
     else:
         res = pd.DataFrame(columns=df_res_cols)
 
@@ -400,7 +411,7 @@ def scores(attack_type, uuid, group_size, labels, predictions, _scores):
     )
 
     # save the new pickle to disk
-    res.to_csv('results/' + 'res_' + str(group_size) + '.csv', index=False)
+    res.to_csv(RESULT_PATH + 'res_' + str(group_size) + '.csv', index=False)
 
 def attack(trips, target, group_size, tr_trips_id, ts_trips_id,
            tr_data_size, ts_data_size, user_path):
@@ -476,7 +487,9 @@ def main(trips_id_targetted, users_targetted, trips, group_sizes,
         for group_size in group_sizes:
             print("Group Size:", group_size)
             # path precomputed data
-            user_path = f"./data/user-dfs/user-{target}_groupsize-{group_size}_rounding-{ROUNDING}/"
+            user_path = f"data/user-dfs/{TR_TS_NAME}/user-{target}_groupsize-{group_size}_rounding-{ROUNDING}/"
+            if LACIE:
+                user_path = LACIE_PATH + "/membership/" + user_path
 
             # attack
             attack(
