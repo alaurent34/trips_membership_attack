@@ -69,10 +69,9 @@ def membership_preprocessing():
     """
     trips = pd.read_csv("../../data/preprocessed/csv/coo_alpha=100.csv")
     trips_sampled, trips, uuid_sampled = sample_uuid(trips, 100, 16, 1)
-    trips.to_csv("../../data/preprocessed/membership/trips.csv", index=False)
-    trips_sampled.to_csv(
-        "../../data/preprocessed/membership/trips_id_target.csv",
-        header="trip_id",
-        index=False
-    )
-    np.save("../../data/preprocessed/membership/uuid_target", uuid_sampled)
+    trips.to_csv("./data/trips.csv", index=False)
+    trips_sampled.to_csv( "./data/trips_id_target.csv", header="trip_id", index=False)
+    np.save("./data/uuid_target", uuid_sampled)
+
+if __name__ == "__main__":
+    membership_preprocessing()
